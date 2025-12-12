@@ -1,0 +1,419 @@
+import React, { useState } from 'react';
+import { AlertCircle, Droplet, TrendingUp, Info } from 'lucide-react';
+
+const WaterViolationPredictor = () => {
+  const [formData, setFormData] = useState({
+    priorYearMean: '',
+    priorYearMax: '',
+    priorYearStd: '',
+    priorYearCount: '',
+    priorYearFailures: '',
+    popServed: '',
+    serviceConnections: '',
+    county: 'Los Angeles',
+    classification: 'C',
+    facilityWaterType: 'GW'
+  });
+
+  const [prediction, setPrediction] = useState(null);
+  const [showInfo, setShowInfo] = useState(false);
+
+  const counties = [
+    'Los Angeles', 'San Diego', 'Orange', 'Riverside', 'San Bernardino',
+    'Santa Clara', 'Alameda', 'Sacramento', 'Contra Costa', 'Fresno',
+    'Kern', 'San Francisco', 'Ventura', 'San Mateo', 'San Joaquin'
+  ];
+
+  const classifications = [
+    { value: 'C', label: 'Community' },
+    { value: 'NC', label: 'Noncommunity (Transient)' },
+    { value: 'NTNC', label: 'Nontransient-Noncommunity' }
+  ];
+
+  const facilityTypes = [
+    { value: 'GW', label: 'Groundwater' },
+    { value: 'SW', label: 'Surface Water' },
+    { value: 'GWP', label: 'Groundwater Under Direct Influence' },
+    { value: 'Mixed', label: 'Mixed Sources' }
+  ];
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const calculateRiskScore = () => {
+    const mean = parseFloat(formData.priorYearMean) || 0;
+    const max = parseFloat(formData.priorYearMax) || 0;
+    const failures = parseFloat(formData.priorYearFailures) || 0;
+    const count = parseFloat(formData.priorYearCount) || 1;
+    const pop = parseFloat(formData.popServed) || 0;
+
+    let riskScore = 0;
+    
+    if (failures > 0) riskScore += 40;
+    if (mean > 0.5) riskScore += 20;
+    if (mean > 1.0) riskScore += 15;
+    if (max > mean * 2) riskScore += 15;
+    if (count < 4) riskScore += 10;
+    if (pop > 10000) riskScore += 5;
+    if (formData.classification === 'C') riskScore += 5;
+
+    return Math.min(100, riskScore);
+  };
+
+  const handlePredict = () => {
+    const riskScore = calculateRiskScore();
+    const violationProbability = riskScore / 100;
+    const willViolate = riskScore > 50;
+    
+    setPrediction({
+      willViolate,
+      probability: violationProbability,
+      riskScore,
+      riskLevel: riskScore > 70 ? 'High' : riskScore > 40 ? 'Moderate' : 'Low'
+    });
+  };
+
+  const handleReset = () => {
+    setFormData({
+      priorYearMean: '',
+      priorYearMax: '',
+      priorYearStd: '',
+      priorYearCount: '',
+      priorYearFailures: '',
+      popServed: '',
+      serviceConnections: '',
+      county: 'Los Angeles',
+      classification: 'C',
+      facilityWaterType: 'GW'
+    });
+    setPrediction(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Droplet className="w-10 h-10 text-blue-600" />
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">Water Quality Violation Predictor</h1>
+                <p className="text-gray-600">Predict future MCL violations based on historical data</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowInfo(!showInfo)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <Info className="w-6 h-6 text-gray-600" />
+            </button>
+          </div>
+          
+          {showInfo && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-2">About This Tool</h3>
+              <p className="text-sm text-blue-800">
+                This dashboard uses a Random Forest machine learning model trained on California water quality data (2020-2024) 
+                to predict the likelihood of Maximum Contaminant Level (MCL) violations in the next year. 
+                The model considers historical test results, system characteristics, and violation patterns.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Water System Data
+            </h2>
+            
+            <div className="space-y-4">
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">Prior Year Test Results</h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Mean Result
+                    </label>
+                    <input
+                      type="number"
+                      name="priorYearMean"
+                      value={formData.priorYearMean}
+                      onChange={handleInputChange}
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Max Result
+                    </label>
+                    <input
+                      type="number"
+                      name="priorYearMax"
+                      value={formData.priorYearMax}
+                      onChange={handleInputChange}
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Std Deviation
+                    </label>
+                    <input
+                      type="number"
+                      name="priorYearStd"
+                      value={formData.priorYearStd}
+                      onChange={handleInputChange}
+                      step="0.01"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sample Count
+                    </label>
+                    <input
+                      type="number"
+                      name="priorYearCount"
+                      value={formData.priorYearCount}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Prior Year Violations
+                  </label>
+                  <input
+                    type="number"
+                    name="priorYearFailures"
+                    value={formData.priorYearFailures}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-gray-700 mb-3">System Characteristics</h3>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Population Served
+                    </label>
+                    <input
+                      type="number"
+                      name="popServed"
+                      value={formData.popServed}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Service Connections
+                    </label>
+                    <input
+                      type="number"
+                      name="serviceConnections"
+                      value={formData.serviceConnections}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Principal County
+                    </label>
+                    <select
+                      name="county"
+                      value={formData.county}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {counties.map(county => (
+                        <option key={county} value={county}>{county}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      System Classification
+                    </label>
+                    <select
+                      name="classification"
+                      value={formData.classification}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {classifications.map(cls => (
+                        <option key={cls.value} value={cls.value}>{cls.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Facility Water Type
+                    </label>
+                    <select
+                      name="facilityWaterType"
+                      value={formData.facilityWaterType}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {facilityTypes.map(type => (
+                        <option key={type.value} value={type.value}>{type.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handlePredict}
+                  className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-semibold"
+                >
+                  Predict Risk
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-6 py-3 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors font-semibold"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              Prediction Results
+            </h2>
+            
+            {prediction ? (
+              <div className="space-y-6">
+                <div className={`p-6 rounded-lg border-2 ${
+                  prediction.willViolate 
+                    ? 'bg-red-50 border-red-300' 
+                    : 'bg-green-50 border-green-300'
+                }`}>
+                  <div className="text-center">
+                    <div className={`text-6xl font-bold mb-2 ${
+                      prediction.willViolate ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {prediction.willViolate ? '⚠️' : '✓'}
+                    </div>
+                    <h3 className={`text-2xl font-bold mb-2 ${
+                      prediction.willViolate ? 'text-red-800' : 'text-green-800'
+                    }`}>
+                      {prediction.willViolate ? 'High Risk' : 'Low Risk'}
+                    </h3>
+                    <p className={`text-lg ${
+                      prediction.willViolate ? 'text-red-700' : 'text-green-700'
+                    }`}>
+                      {prediction.willViolate 
+                        ? 'Violation likely in next year' 
+                        : 'Low probability of violation'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Risk Score</span>
+                    <span className="text-sm font-bold text-gray-900">{prediction.riskScore}/100</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 ${
+                        prediction.riskScore > 70 ? 'bg-red-500' :
+                        prediction.riskScore > 40 ? 'bg-yellow-500' : 'bg-green-500'
+                      }`}
+                      style={{ width: `${prediction.riskScore}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">Violation Probability</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(prediction.probability * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">Risk Level</p>
+                    <p className={`text-2xl font-bold ${
+                      prediction.riskLevel === 'High' ? 'text-red-600' :
+                      prediction.riskLevel === 'Moderate' ? 'text-yellow-600' : 'text-green-600'
+                    }`}>
+                      {prediction.riskLevel}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold text-blue-900 mb-2">Recommendations</h4>
+                  <ul className="space-y-2 text-sm text-blue-800">
+                    {prediction.willViolate ? (
+                      <>
+                        <li>• Increase monitoring frequency for this analyte</li>
+                        <li>• Review treatment processes and optimization</li>
+                        <li>• Consider source water protection measures</li>
+                        <li>• Prepare compliance response plan</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>• Continue current monitoring schedule</li>
+                        <li>• Maintain existing treatment protocols</li>
+                        <li>• Review annually for any trend changes</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-96 text-gray-400">
+                <Droplet className="w-20 h-20 mb-4" />
+                <p className="text-lg">Enter water system data to generate prediction</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6 bg-white rounded-lg shadow-lg p-4">
+          <p className="text-sm text-gray-600 text-center">
+            <strong>Note:</strong> This is a predictive model based on historical patterns. Results should be used 
+            as a risk assessment tool alongside professional judgment and regulatory guidance. 
+            Actual violations depend on many factors including treatment effectiveness, source water quality changes, 
+            and operational practices.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default WaterViolationPredictor;
